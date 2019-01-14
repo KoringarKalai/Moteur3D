@@ -43,7 +43,30 @@ void drawTriangle(int x0, int y0, int x1, int y1, int x2, int y2, TGAImage &imag
     line(x2,y2,x1,y1,image,color);
 }
 
-
+void fillTriangle(int x0, int y0, int x1, int y1, int x2, int y2, TGAImage &image, TGAColor color) {
+	// (x0,y0) et (x1,y1) forme le plus grand segment (hypotenus)
+	if (std::abs(y0-y1)<std::abs(y0-y2)) { 
+        std::swap(x1, x2); 
+        std::swap(y1, y2); 
+    }
+    // (x0,y0) est plus bas que (x1,y1)
+    if (y0 > y1) {
+    	std::swap(x0, x1); 
+        std::swap(y0, y1);
+    }
+    for (int y = y0; y < y1; y++) {
+    	float t = (y-y0)/(float)(y1-y0); 
+        int xg = x0*(1.-t) + x1*t; 
+    	t = (y-y0)/(float)(y2-y0); 
+    	int xd = x0*(1.-t) + x2*t;
+    	if (xd < xg) {
+        	std::swap(xg, xd);     		
+    	}
+    	for (int x = xg; x < xd; x++) {
+    		image.set(x, y, color);
+    	}
+    }
+}
 
 void drawFile(int width, int height, TGAImage &image, TGAColor color) {
     float** points = new float*[3];
