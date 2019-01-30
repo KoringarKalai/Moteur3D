@@ -21,9 +21,6 @@
     <ClInclude Include="tgaimage.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
-    <ClInclude Include="Point.h">
-      <Filter>Fichiers d%27en-tête</Filter>
-    </ClInclude>
     <ClInclude Include="resource.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
@@ -36,9 +33,6 @@
       <Filter>Fichiers sources</Filter>
     </ClCompile>
     <ClCompile Include="tgaimage.cpp">
-      <Filter>Fichiers sources</Filter>
-    </ClCompile>
-    <ClCompile Include="Point.cpp">
       <Filter>Fichiers sources</Filter>
     </ClCompile>
   </ItemGroup>
