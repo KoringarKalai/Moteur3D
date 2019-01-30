@@ -88,7 +88,7 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
 	}
 }
 
-void fillTriangle(VectF p0, VectF p1, VectF p2, TGAImage &image, TGAColor color, float **zbuffer) {
+void fillTriangle(VectF p0, VectF p1, VectF p2, TGAImage &image, TGAImage &imageTexture, VectF c0, VectF c1, VectF c2, float teinte, float **zbuffer) {
 	int xmin = std::min(std::min(p0.x,p1.x),p2.x);
 	int xmax = std::max(std::max(p0.x, p1.x), p2.x);
 	int ymin = std::min(std::min(p0.y, p1.y), p2.y);
@@ -102,7 +102,11 @@ void fillTriangle(VectF p0, VectF p1, VectF p2, TGAImage &image, TGAColor color,
 			P.z += p0.z * bary.x + p1.z * bary.y + p2.z * bary.z;
 			if (zbuffer[(int)P.x][(int)P.y] < P.z) {
 				zbuffer[(int)P.x][(int)P.y] = P.z;
-				image.set((int)P.x, (int)P.y, TGAColor(P.z / 2000 * 255 , P.z / 2000 * 255, P.z / 2000 * 255, 255));
+				float xc = c0.x * bary.x + c1.x * bary.y + c2.x * bary.z;
+				float yc = c0.y * bary.x + c1.y * bary.y + c2.y * bary.z;
+				TGAColor couleur = imageTexture.get(xc * 1024 , yc * 1024);
+				for (int i = 0; i < 3; i++) couleur.raw[i] *= teinte;
+				image.set((int)P.x, (int)P.y, couleur);
 			}
 		}
 	}
@@ -110,9 +114,15 @@ void fillTriangle(VectF p0, VectF p1, VectF p2, TGAImage &image, TGAColor color,
 
 void drawFile(int width, int height, int profondeur, TGAImage &image, TGAColor color) {
 	std::vector<VectF> points;
+	std::vector<VectF> colors;
 	std::vector<std::vector<float>> triangle;
-	std::ifstream infile("obj/african_head/african_head.obj");
-	//std::ifstream infile("obj/diablo3_pose/diablo3_pose.obj");
+	std::vector<std::vector<float>> texture;
+	TGAImage imageTexture = TGAImage();
+	//std::ifstream infile("obj/african_head/african_head.obj");
+	//imageTexture.read_tga_file("obj/african_head/african_head_diffuse.tga");
+	std::ifstream infile("obj/diablo3_pose/diablo3_pose.obj");
+	imageTexture.read_tga_file("obj/diablo3_pose/diablo3_pose_diffuse.tga");
+	imageTexture.flip_vertically();
 	std::string line;
 	int i = 0;
 	int j = 0;
@@ -125,16 +135,25 @@ void drawFile(int width, int height, int profondeur, TGAImage &image, TGAColor c
 			VectF p = VectF(a, b, c);
 			points.push_back(p);
 			i++;
-		}
-		else if (!line.compare(0, 2, "f ")) {
+		} else if (!line.compare(0, 3, "vt ")) {
+			float a, b, c;
+			iss >> trash >> trash >> a >> b >> c;
+			VectF p = VectF(a, b, c);
+			colors.push_back(p);
+			i++;
+		} else if (!line.compare(0, 2, "f ")) {
 			iss >> trash;
 			std::vector<float> t;
-			int num, rien;
-			while (iss >> num >> trash >> rien >> trash >> rien) {
+			std::vector<float> tT;
+			int num, num2 ,rien;
+			while (iss >> num >> trash >> num2 >> trash >> rien) {
 				float v = num - 1;
 				t.push_back(v);
+				v = num2 - 1;
+				tT.push_back(v);
 			}
 			triangle.push_back(t);
+			texture.push_back(tT);
 			j++;
 		}
 	}
@@ -171,8 +190,7 @@ void drawFile(int width, int height, int profondeur, TGAImage &image, TGAColor c
 		float produit = (VectCamera.x * pv.x + VectCamera.y * pv.y + VectCamera.z * pv.z);
 		// Si le produit est positif on dessine sinon non 
 		if (produit > 0) {
-			int teinte = produit * 255;
-			TGAColor color = TGAColor(teinte, teinte, teinte, 255);
+			float teinte = produit;
 			VectF p0 = VectF(
 				int(points[ix0].x * width / 2 + width / 2), 
 				int(points[ix0].y * height / 2 + height / 2),
@@ -185,7 +203,14 @@ void drawFile(int width, int height, int profondeur, TGAImage &image, TGAColor c
 				int(points[ix2].x * width / 2 + width / 2),
 				int(points[ix2].y * height / 2 + height / 2),
 				int(points[ix2].z * profondeur / 2 + profondeur / 2));
-			fillTriangle(p0, p1, p2, image, color, zbuffer);
+
+			int ix0T = texture[i][0];
+			int ix1T = texture[i][1];
+			int ix2T = texture[i][2];
+			VectF c0 = VectF(colors[ix0T].x, colors[ix0T].y, colors[ix0T].z);
+			VectF c1 = VectF(colors[ix1T].x, colors[ix1T].y, colors[ix1T].z);
+			VectF c2 = VectF(colors[ix2T].x, colors[ix2T].y, colors[ix2T].z);
+			fillTriangle(p0, p1, p2, image, imageTexture, c0, c1, c2, teinte, zbuffer);
 		}
 	}
 }
@@ -193,30 +218,8 @@ void drawFile(int width, int height, int profondeur, TGAImage &image, TGAColor c
 int main(int argc, char** argv) {
 	int h = 2000, w = 2000, p = 2000;
 	TGAImage image(h, w, TGAImage::RGB);
-	//line(18,14,84,76,image,white);
-	//drawTriangle(18,20,60,35,40,84,image,white);
-	//fillTriangle(118, 20, 160, 35, 140, 84, image, white);
-	//fillTriangle(20, 20, 50, 50, 20, 80, image, white);
-	//drawTriangle(20, 20, 50, 50, 20, 80, image, red);
-	//fillTriangle(120, 20, 150, 50, 120, 80, image, white);
-	//fillTriangle(80, 180, 50, 150, 20, 180, image, white);
-	//drawTriangle(80, 180, 50, 150, 20, 180, image, red);
-	//fillTriangle(180, 180, 150, 150, 120, 180, image, white);
-	//fillTriangle(80, 220, 50, 250, 80, 280, image, white);
-	//drawTriangle(80, 220, 50, 250, 80, 280, image, red);
-	//fillTriangle(180, 220, 150, 250, 180, 280, image, white);
-	//fillTriangle(80, 320, 50, 350, 20, 320, image, white);
-	//drawTriangle(80, 320, 50, 350, 20, 320, image, red);
-	//fillTriangle(180, 320, 150, 350, 120, 320, image, white);
-	
 	drawFile(h, w, p, image, white);
 
-	//Point p1 = Point(18, 14, 13);
-	//Point p2 = Point(60, 35, 84);
-	//Point p3 = Point(40, 80, 84);
-	//drawTriangle(p1, p2, p3, image, white);
-
-	//fillTriangle(p1, p2, p3, image, white);
 	image.flip_vertically(); // i want to have the origin at the left bottom corner of the image
 	image.write_tga_file("output.tga");
 	return 0;
