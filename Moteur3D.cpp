@@ -88,32 +88,21 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
 	}
 }
 
-void drawTriangle(int x0, int y0, int x1, int y1, int x2, int y2, TGAImage &image, TGAColor color) {
-	line(x0, y0, x1, y1, image, color);
-	line(x0, y0, x2, y2, image, color);
-	line(x2, y2, x1, y1, image, color);
-}
-
-void drawTriangle(VectF p0, VectF p1, VectF p2, TGAImage &image, TGAColor color) {
-	line(p0.x, p0.y, p1.x, p1.y, image, color);
-	line(p0.x, p0.y, p2.x, p2.y, image, color);
-	line(p2.x, p2.y, p1.x, p1.y, image, color);
-}
-
 void fillTriangle(VectF p0, VectF p1, VectF p2, TGAImage &image, TGAColor color, float **zbuffer) {
 	int xmin = std::min(std::min(p0.x,p1.x),p2.x);
 	int xmax = std::max(std::max(p0.x, p1.x), p2.x);
 	int ymin = std::min(std::min(p0.y, p1.y), p2.y);
 	int ymax = std::max(std::max(p0.y, p1.y), p2.y);
-	for (int x = xmin; x <= xmax; x++) {
-		for (int y = ymin; y <= ymax; y++) {
-			VectF P = barycentric(p0, p1, p2, VectF(x,y,0));
-			if (P.x < 0 || P.y < 0 || P.z < 0) continue;
+	VectF P;
+	for (P.x = xmin; P.x <= xmax; P.x++) {
+		for (P.y = ymin; P.y <= ymax; P.y++) {
+			VectF bary = barycentric(p0, p1, p2, P);
+			if (bary.x < 0 || bary.y < 0 || bary.z < 0) continue;
 			P.z = 0;
-			P.z += p0.z * P.x + p1.z * P.y + p2.z * P.z;
-			if (zbuffer[x][y] < P.z) {
-				zbuffer[x][y] = P.z;
-				image.set(x, y, color);
+			P.z += p0.z * bary.x + p1.z * bary.y + p2.z * bary.z;
+			if (zbuffer[(int)P.x][(int)P.y] < P.z) {
+				zbuffer[(int)P.x][(int)P.y] = P.z;
+				image.set((int)P.x, (int)P.y, TGAColor(P.z / 2000 * 255 , P.z / 2000 * 255, P.z / 2000 * 255, 255));
 			}
 		}
 	}
