@@ -13,11 +13,6 @@
 #include <stdlib.h>
 #include <limits>
 
-const TGAColor white = TGAColor(255, 255, 255, 255);
-const TGAColor red = TGAColor(255, 0, 0, 255);
-
-int anaglyph = 1;
-
 struct VectF {
 	float x, y, z;
 
@@ -73,6 +68,51 @@ struct Matrix {
 					m[i][j] = 0;
 			}
 		}
+	}
+
+	void rotX(float alpha) {
+		for (int i = 0; i < row; ++i) {
+			for (int j = 0; j < col; j++) {
+				if (i == j)
+					m[i][j] = 1;
+				else
+					m[i][j] = 0;
+			}
+		}
+		m[0][0] = std::cos(alpha);
+		m[1][0] = std::sin(alpha);
+		m[1][1] = std::cos(alpha);
+		m[0][1] = -std::sin(alpha);
+	}
+
+	void rotZ(float alpha) {
+		for (int i = 0; i < row; ++i) {
+			for (int j = 0; j < col; j++) {
+				if (i == j)
+					m[i][j] = 1;
+				else
+					m[i][j] = 0;
+			}
+		}
+		m[1][1] = std::cos(alpha);
+		m[2][1] = std::sin(alpha);
+		m[2][2] = std::cos(alpha);
+		m[1][2] = -std::sin(alpha);
+	}
+
+	void rotY(float alpha) {
+		for (int i = 0; i < row; ++i) {
+			for (int j = 0; j < col; j++) {
+				if (i == j)
+					m[i][j] = 1;
+				else
+					m[i][j] = 0;
+			}
+		}
+		m[0][0] = std::cos(alpha);
+		m[2][0] = -std::sin(alpha);
+		m[2][2] = std::cos(alpha);
+		m[0][2] = std::sin(alpha);
 	}
 };
 
@@ -142,6 +182,13 @@ VectF m2v(Matrix m) {
 	return VectF(m.m[0][0] / m.m[3][0], m.m[1][0] / m.m[3][0], m.m[2][0] / m.m[3][0]);
 }
 
+const TGAColor white = TGAColor(255, 255, 255, 255);
+const TGAColor red = TGAColor(255, 0, 0, 255);
+
+int anaglyph;
+int h = 800, w = 800, p = 255;
+VectF eye;
+
 void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
 	bool steep = false;
 	if (std::abs(x0 - x1) < std::abs(y0 - y1)) {
@@ -175,9 +222,13 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
 
 void fillTriangle(VectF p0, VectF p1, VectF p2, TGAImage &image, TGAImage &imageTexture, TGAImage &imageNm, VectF c0, VectF c1, VectF c2, float **zbuffer) {
 	int xmin = std::min(std::min(p0.x,p1.x),p2.x);
+	xmin = std::max(0, xmin);
 	int xmax = std::max(std::max(p0.x, p1.x), p2.x);
+	xmax = std::min(w-1, xmax);
 	int ymin = std::min(std::min(p0.y, p1.y), p2.y);
+	ymin = std::max(0, ymin);
 	int ymax = std::max(std::max(p0.y, p1.y), p2.y);
+	ymax = std::min(h-1, ymax);
 	VectF P;
 	for (P.x = xmin; P.x <= xmax; P.x++) {
 		for (P.y = ymin; P.y <= ymax; P.y++) {
@@ -195,29 +246,31 @@ void fillTriangle(VectF p0, VectF p1, VectF p2, TGAImage &image, TGAImage &image
 				TGAColor colorNm = imageNm.get(xc * 1024, yc * 1024);
 
 				VectF color = VectF((float)colorNm.r /128 - 1, (float)colorNm.g / 128 - 1, (float)colorNm.b / 128 - 1);
-				VectF eye = VectF(0,0,1);
-				eye.normalize();
+				VectF lumiere = eye;
+				lumiere.normalize();
 
-				float intensity = (eye.x * color.x + eye.y * color.y + eye.z * color.z);
+				float intensity = (lumiere.x * color.x + lumiere.y * color.y + lumiere.z * color.z);
 
 				intensity = std::max(std::min(intensity, 1.f), 0.f);
 				for (int i = 0; i < 3; i++) couleur.raw[i] *= intensity;
 				
-				// Anaglyph
-				if (anaglyph == 1) {
-					intensity = 0.2126 * couleur.raw[0] + 0.7152 * couleur.raw[1] + 0.0722 * couleur.raw[2];
-					TGAColor oldColor = image.get((int)P.x, (int)P.y);
-					oldColor.raw[0] = intensity;
-					image.set((int)P.x, (int)P.y, oldColor);
+				if (anaglyph > 0) {
+					// Anaglyph
+					if (anaglyph == 1) {
+						TGAColor oldColor = image.get((int)P.x, (int)P.y);
+						oldColor.raw[2] = couleur.r;
+						image.set((int)P.x, (int)P.y, oldColor);
+					}
+					else {
+						TGAColor oldColor = image.get((int)P.x, (int)P.y);
+						oldColor.raw[0] = couleur.b;
+						oldColor.raw[1] = couleur.g;
+						image.set((int)P.x, (int)P.y, oldColor);
+					}
 				} else {
-					intensity = 0.2126 * couleur.raw[0] + 0.7152 * couleur.raw[1] + 0.0722 * couleur.raw[2];
-					TGAColor oldColor = image.get((int)P.x + 60, (int)P.y);
-					oldColor.raw[2] = intensity;
-					image.set((int)P.x + 60, (int)P.y, oldColor);
-
+					// Normal 
+					image.set((int)P.x, (int)P.y, couleur);
 				}
-				// Normal 
-				//image.set((int)P.x, (int)P.y, couleur);
 			}
 		}
 	}
@@ -310,10 +363,9 @@ void drawFile(int width, int height, int profondeur, TGAImage &image, TGAColor c
 		VectF c2 = VectF(colors[ix2T].x, colors[ix2T].y, colors[ix2T].z);
 
 		float eyesep = 0.1;
-		VectF eye = VectF(1 - eyesep, 0, 1);
+		eye = VectF(0 - eyesep, 0, 2);
 		if (anaglyph == 1)
 			eye = VectF(eye.x + eyesep, eye.y, eye.z);
-		eye.normalize();
 		VectF center = VectF(0, 0, 0);
 		Matrix ModelView = lookAt(eye,center, VectF(0, 1, 0));
 		VectF n = VectF(eye.x - center.x, eye.y - center.y, eye.z - center.z);
@@ -322,23 +374,39 @@ void drawFile(int width, int height, int profondeur, TGAImage &image, TGAColor c
 		Projection.m[3][2] = -1.f / n.norme();
 		Matrix ViewPort = viewPort(width / 8, height / 8, width * 3 / 4, height * 3 / 4, profondeur * 3 / 4);
 		
+		Matrix rot = Matrix(4,4);
+		rot.identity();
+		Matrix rotX = Matrix(4, 4);
+		rotX.rotX(45 * 3.14 / 180);
+		Matrix rotY = Matrix(4, 4);
+		rotY.rotY(45 * 3.14 / 180);
+		Matrix rotZ = Matrix(4, 4);
+		rotZ.rotZ(45 * 3.14 / 180);
+
+		//rot = mult(rot, rotX);
+		//rot = mult(rot, rotY);
+		//rot = mult(rot, rotZ);
+
 		Matrix vpp = mult(ViewPort, Projection);
 		Matrix vppvm = mult(vpp, ModelView);
-		p0 = m2v(mult(vppvm, v2m(p0)));
-		p1 = m2v(mult(vppvm, v2m(p1)));
-		p2 = m2v(mult(vppvm, v2m(p2)));
+		Matrix vppvmrot = mult(vppvm, rot);
+		p0 = m2v(mult(vppvmrot, v2m(p0)));
+		p1 = m2v(mult(vppvmrot, v2m(p1)));
+		p2 = m2v(mult(vppvmrot, v2m(p2)));
 		
 		fillTriangle(p0, p1, p2, image, imageTexture, imageNm, c0, c1, c2, zbuffer);
 	}
 }
 
 int main(int argc, char** argv) {
-	int h = 2000, w = 2000, p = 255;
-	TGAImage image(h + 60, w, TGAImage::RGB);
+	TGAImage image(w, h, TGAImage::RGB);
+	anaglyph = 1;
 	drawFile(h, w, p, image, white);
-	anaglyph = 0;
-	drawFile(h, w, p, image, white);
-
+	
+	if (anaglyph > 0) {
+		anaglyph = 2;
+		drawFile(h, w, p, image, white);
+	}
 
 	image.flip_vertically(); // i want to have the origin at the left bottom corner of the image
 	image.write_tga_file("output.tga");
