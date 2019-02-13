@@ -11,6 +11,7 @@
 #include <string>
 #include <Vector>
 #include <stdlib.h>
+#include <time.h>
 #include <limits>
 
 struct VectF {
@@ -221,10 +222,10 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
 }
 
 void fillTriangle(VectF p0, VectF p1, VectF p2, TGAImage &image, TGAImage &imageTexture, TGAImage &imageNm, VectF c0, VectF c1, VectF c2, float **zbuffer) {
-	int xmin = std::min(std::min(p0.x,p1.x),p2.x);
-	xmin = std::max(0, xmin);
+	int xmin = std::min(std::min(p0.x, p1.x), p2.x);
+	xmin = std::max(0, xmin); 
 	int xmax = std::max(std::max(p0.x, p1.x), p2.x);
-	xmax = std::min(w-1, xmax);
+	xmax = std::min(w-1, xmax); 
 	int ymin = std::min(std::min(p0.y, p1.y), p2.y);
 	ymin = std::max(0, ymin);
 	int ymax = std::max(std::max(p0.y, p1.y), p2.y);
@@ -257,15 +258,18 @@ void fillTriangle(VectF p0, VectF p1, VectF p2, TGAImage &image, TGAImage &image
 				if (anaglyph > 0) {
 					// Anaglyph
 					if (anaglyph == 1) {
-						TGAColor oldColor = image.get((int)P.x, (int)P.y);
+						TGAColor oldColor = image.get((int)P.x , (int)P.y);
 						oldColor.raw[2] = couleur.r;
 						image.set((int)P.x, (int)P.y, oldColor);
 					}
 					else {
-						TGAColor oldColor = image.get((int)P.x, (int)P.y);
-						oldColor.raw[0] = couleur.b;
-						oldColor.raw[1] = couleur.g;
-						image.set((int)P.x, (int)P.y, oldColor);
+						float decalage = 5;
+						if (P.x - decalage >= 0) {
+							TGAColor oldColor = image.get((int)P.x - decalage, (int)P.y);
+							oldColor.raw[0] = couleur.b;
+							oldColor.raw[1] = couleur.g;
+							image.set((int)P.x - decalage, (int)P.y, oldColor);
+						}
 					}
 				} else {
 					// Normal 
@@ -362,10 +366,13 @@ void drawFile(int width, int height, int profondeur, TGAImage &image, TGAColor c
 		VectF c1 = VectF(colors[ix1T].x, colors[ix1T].y, colors[ix1T].z);
 		VectF c2 = VectF(colors[ix2T].x, colors[ix2T].y, colors[ix2T].z);
 
-		float eyesep = 0.1;
-		eye = VectF(0 - eyesep, 0, 2);
-		if (anaglyph == 1)
-			eye = VectF(eye.x + eyesep, eye.y, eye.z);
+		//float eyesep = 0.1;
+		float leX = ((double)rand() / (RAND_MAX)) + 1;
+		float leY = ((double)rand() / (RAND_MAX)) + 1;
+		float leZ = ((double)rand() / (RAND_MAX)) + 1;
+		eye = VectF(1, 0, 3);
+		//if (anaglyph == 1)
+		//	eye = VectF(eye.x + eyesep, eye.y, eye.z);
 		VectF center = VectF(0, 0, 0);
 		Matrix ModelView = lookAt(eye,center, VectF(0, 1, 0));
 		VectF n = VectF(eye.x - center.x, eye.y - center.y, eye.z - center.z);
@@ -379,12 +386,13 @@ void drawFile(int width, int height, int profondeur, TGAImage &image, TGAColor c
 		Matrix rotX = Matrix(4, 4);
 		rotX.rotX(45 * 3.14 / 180);
 		Matrix rotY = Matrix(4, 4);
-		rotY.rotY(45 * 3.14 / 180);
+		rotY.rotY(2 * 3.14 / 180);
 		Matrix rotZ = Matrix(4, 4);
 		rotZ.rotZ(45 * 3.14 / 180);
 
 		//rot = mult(rot, rotX);
-		//rot = mult(rot, rotY);
+		if (anaglyph == 1)
+		rot = mult(rot, rotY);
 		//rot = mult(rot, rotZ);
 
 		Matrix vpp = mult(ViewPort, Projection);
@@ -400,6 +408,15 @@ void drawFile(int width, int height, int profondeur, TGAImage &image, TGAColor c
 
 int main(int argc, char** argv) {
 	TGAImage image(w, h, TGAImage::RGB);
+	for (int i = 0; i < w; i++) {
+		for (int j = 0; j < h; j++) {
+			int intensity = 30;
+			image.set(i, j, TGAColor(intensity, intensity, intensity, 255));
+		}
+	}
+	//image.read_tga_file("obj/FondMinecraft.tga");
+	image.flip_vertically();
+
 	anaglyph = 1;
 	drawFile(h, w, p, image, white);
 	
